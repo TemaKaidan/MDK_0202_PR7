@@ -46,8 +46,6 @@ namespace PR7_HttpNaewPAT_Mohov
             }
         }
 
-
-
         public static void GetContent(Cookie Token)
         {
             string url = "";
@@ -81,6 +79,26 @@ namespace PR7_HttpNaewPAT_Mohov
             HttpWebResponse response = (HttpWebResponse)request.GetResponse();
             string htmlCode = new StreamReader(response.GetResponseStream()).ReadToEnd();
             return htmlCode;
+        }
+
+        public static async Task AddRecord(string title, string description, string imageUrl)
+        {
+            string url = "http://news.permaviat.ru/add";
+            Trace.WriteLine($"Выполняем запрос: {url}");
+            using (HttpClient client = new HttpClient())
+            {
+                var formData = new Dictionary<string, string>
+                {
+                    { "title", title },
+                    { "description", description },
+                    { "image", imageUrl }
+                };
+                var content = new FormUrlEncodedContent(formData);
+                HttpResponseMessage response = await client.PostAsync(url, content);
+                Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
+                string responseFromServer = await response.Content.ReadAsStringAsync();
+                Console.WriteLine(responseFromServer);
+            }
         }
     }
 }
