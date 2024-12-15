@@ -1,11 +1,11 @@
-﻿using System;
+﻿using HtmlAgilityPack;
+using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Text;
 using System.Threading.Tasks;
 
 namespace PR7_HttpNaewPAT_Mohov
@@ -46,6 +46,8 @@ namespace PR7_HttpNaewPAT_Mohov
             }
         }
 
+
+
         public static void GetContent(Cookie Token)
         {
             string url = "";
@@ -57,6 +59,28 @@ namespace PR7_HttpNaewPAT_Mohov
             Debug.WriteLine($"Статус выполнения: {response.StatusCode}");
             string responseFromServer = new StreamReader(response.GetResponseStream()).ReadToEnd();
             Console.WriteLine(responseFromServer);
+        }
+
+        public static void ParsingHtml(string htmlCode)
+        {
+            var html = new HtmlDocument();
+            html.LoadHtml(htmlCode);
+            var Document = html.DocumentNode;
+            IEnumerable<HtmlNode> Content = Document.Descendants(0).Where(n => n.HasClass(""));
+            foreach (HtmlNode content in Content)
+            {
+                var src = content.ChildNodes[1].GetAttributeValue("src", "none");
+                var name = content.ChildNodes[3].InnerText;
+                var description = content.ChildNodes[5].InnerText;
+                Console.WriteLine(name + "\n" + "Изображение: " + src + "\n" + "Описание: " + description);
+            }
+        }
+        public static string GetHtmlFromUrl(string url)
+        {
+            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
+            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
+            string htmlCode = new StreamReader(response.GetResponseStream()).ReadToEnd();
+            return htmlCode;
         }
     }
 }
