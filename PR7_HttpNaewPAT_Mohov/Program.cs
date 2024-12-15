@@ -4,7 +4,6 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net;
 using System.Net.Http;
 using System.Threading.Tasks;
 
@@ -14,16 +13,23 @@ namespace PR7_HttpNaewPAT_Mohov
     {
         static async Task Main(string[] args)
         {
-            WebRequest request = WebRequest.Create("");
-            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-            Console.WriteLine(response.StatusDescription);
-            Stream dataStream = response.GetResponseStream();
-            StreamReader reader = new StreamReader(dataStream);
-            string data = reader.ReadToEnd();
-            Console.WriteLine(data);
-            reader.Close();
-            dataStream.Close();
-            response.Close();
+            try
+            {
+                using (StreamWriter file = new StreamWriter("debug.log", true))
+                {
+                    Trace.Listeners.Add(new TextWriterTraceListener(file));
+                    Trace.AutoFlush = true;
+                    await SingIn("student", "Asdfg123");
+                    await AddRecord("Новая запись", "Описание для добавленной новой записи.", "Здесь должна быть картинка)");
+                    string htmlCode = await GetHtmlFromUrl("http://news.permaviat.ru/main");
+                    ParsingHtml(htmlCode);
+                }
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Произошла ошибка: {ex.Message}");
+                Trace.WriteLine($"Произошла ошибка: {ex.Message}");
+            }
             Console.Read();
         }
 
@@ -46,41 +52,6 @@ namespace PR7_HttpNaewPAT_Mohov
             }
         }
 
-        public static void GetContent(Cookie Token)
-        {
-            string url = "";
-            Debug.WriteLine($"Выполняем запрос: {url}");
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            request.CookieContainer = new CookieContainer();
-            request.CookieContainer.Add(Token);
-            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-            Debug.WriteLine($"Статус выполнения: {response.StatusCode}");
-            string responseFromServer = new StreamReader(response.GetResponseStream()).ReadToEnd();
-            Console.WriteLine(responseFromServer);
-        }
-
-        public static void ParsingHtml(string htmlCode)
-        {
-            var html = new HtmlDocument();
-            html.LoadHtml(htmlCode);
-            var Document = html.DocumentNode;
-            IEnumerable<HtmlNode> Content = Document.Descendants(0).Where(n => n.HasClass(""));
-            foreach (HtmlNode content in Content)
-            {
-                var src = content.ChildNodes[1].GetAttributeValue("src", "none");
-                var name = content.ChildNodes[3].InnerText;
-                var description = content.ChildNodes[5].InnerText;
-                Console.WriteLine(name + "\n" + "Изображение: " + src + "\n" + "Описание: " + description);
-            }
-        }
-        public static string GetHtmlFromUrl(string url)
-        {
-            HttpWebRequest request = (HttpWebRequest)WebRequest.Create(url);
-            HttpWebResponse response = (HttpWebResponse)request.GetResponse();
-            string htmlCode = new StreamReader(response.GetResponseStream()).ReadToEnd();
-            return htmlCode;
-        }
-
         public static async Task AddRecord(string title, string description, string imageUrl)
         {
             string url = "http://news.permaviat.ru/add";
@@ -98,6 +69,33 @@ namespace PR7_HttpNaewPAT_Mohov
                 Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
                 string responseFromServer = await response.Content.ReadAsStringAsync();
                 Console.WriteLine(responseFromServer);
+            }
+        }
+
+        public static async Task<string> GetHtmlFromUrl(string url)
+        {
+            Trace.WriteLine($"Выполняем запрос: {url}");
+            using (HttpClient client = new HttpClient())
+            {
+                HttpResponseMessage response = await client.GetAsync(url);
+                Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
+                string htmlCode = await response.Content.ReadAsStringAsync();
+                return htmlCode;
+            }
+        }
+
+        public static void ParsingHtml(string htmlCode)
+        {
+            var html = new HtmlDocument();
+            html.LoadHtml(htmlCode);
+            var Document = html.DocumentNode;
+            var Content = Document.Descendants(0).Where(n => n.HasClass(""));
+            foreach (HtmlNode content in Content)
+            {
+                var src = content.ChildNodes[1].GetAttributeValue("src", "none");
+                var name = content.ChildNodes[3].InnerText;
+                var description = content.ChildNodes[5].InnerText;
+                Console.WriteLine(name + "\n" + "Изображение: " + src + "\n" + "Описание: " + description);
             }
         }
     }
