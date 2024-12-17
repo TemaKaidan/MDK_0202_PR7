@@ -11,6 +11,9 @@ namespace PR7_HttpNaewPAT_Mohov
 {
     public class Program
     {
+        private static HttpClient _httpClient;
+        private static string _cookie;
+
         static async Task Main(string[] args)
         {
             try
@@ -19,9 +22,13 @@ namespace PR7_HttpNaewPAT_Mohov
                 {
                     Trace.Listeners.Add(new TextWriterTraceListener(file));
                     Trace.AutoFlush = true;
-                    await SingIn("student", "Asdfg123");
-                    await AddRecord("Новая запись", "Описание для добавленной новой записи.", "Здесь должна быть картинка)");
-                    string htmlCode = await GetHtmlFromUrl("http://news.permaviat.ru/main");
+                    var handler = new HttpClientHandler();
+                    handler.CookieContainer = new System.Net.CookieContainer();
+                    _httpClient = new HttpClient(handler);
+                    _cookie = await SingIn("admin", "admin");
+                    Console.WriteLine($"Полученная Cookie: {_cookie}");
+                    await AddRecord("Новая запись", "Описание для добавленной новой записи.", "https://www.permaviat.ru/_res/news/1189img.jpg");
+                    string htmlCode = await GetHtmlFromUrl("http://127.0.0.1/main");
                     ParsingHtml(htmlCode);
                 }
             }
@@ -33,55 +40,54 @@ namespace PR7_HttpNaewPAT_Mohov
             Console.Read();
         }
 
-        public static async Task SingIn(string Login, string Password)
+        public static async Task<string> SingIn(string Login, string Password)
         {
-            string url = "http://news.permaviat.ru/ajax/login.php";
+            string url = "http://127.0.0.1/ajax/login.php";
             Trace.WriteLine($"Выполняем запрос: {url}");
-            using (HttpClient client = new HttpClient())
+            var formData = new Dictionary<string, string>
             {
-                var formData = new Dictionary<string, string>
-                {
-                    { "login", Login },
-                    { "password", Password }
-                };
-                var content = new FormUrlEncodedContent(formData);
-                HttpResponseMessage response = await client.PostAsync(url, content);
-                Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
-                string responseFromServer = await response.Content.ReadAsStringAsync();
-                Console.WriteLine(responseFromServer);
+                { "login", Login },
+                { "password", Password }
+            };
+            var content = new FormUrlEncodedContent(formData);
+            HttpResponseMessage response = await _httpClient.PostAsync(url, content);
+            Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
+            string responseFromServer = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Ответ сервера: {responseFromServer}");
+            if (response.Headers.TryGetValues("Set-Cookie", out var cookieValues))
+            {
+                string cookie = cookieValues.FirstOrDefault();
+                return cookie;
             }
+            return null;
         }
 
-        public static async Task AddRecord(string title, string description, string imageUrl)
+        public static async Task AddRecord(string name, string description, string imageUrl)
         {
-            string url = "http://news.permaviat.ru/add";
+            string url = "http://127.0.0.1/ajax/add.php";
             Trace.WriteLine($"Выполняем запрос: {url}");
-            using (HttpClient client = new HttpClient())
+            var formData = new Dictionary<string, string>
             {
-                var formData = new Dictionary<string, string>
-                {
-                    { "title", title },
-                    { "description", description },
-                    { "image", imageUrl }
-                };
-                var content = new FormUrlEncodedContent(formData);
-                HttpResponseMessage response = await client.PostAsync(url, content);
-                Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
-                string responseFromServer = await response.Content.ReadAsStringAsync();
-                Console.WriteLine(responseFromServer);
-            }
+                { "name", name },
+                { "description", description },
+                { "src", imageUrl }
+            };
+            var content = new FormUrlEncodedContent(formData);
+            HttpResponseMessage response = await _httpClient.PostAsync(url, content);
+            Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
+            string responseFromServer = await response.Content.ReadAsStringAsync();
+            Console.WriteLine($"Ответ сервера: {responseFromServer}");
+            if (response.IsSuccessStatusCode) Console.WriteLine(responseFromServer);
+            else Console.WriteLine($"Ошибка при добавлении записи: {response.StatusCode}");
         }
 
         public static async Task<string> GetHtmlFromUrl(string url)
         {
             Trace.WriteLine($"Выполняем запрос: {url}");
-            using (HttpClient client = new HttpClient())
-            {
-                HttpResponseMessage response = await client.GetAsync(url);
-                Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
-                string htmlCode = await response.Content.ReadAsStringAsync();
-                return htmlCode;
-            }
+            HttpResponseMessage response = await _httpClient.GetAsync(url);
+            Trace.WriteLine($"Статус выполнения: {response.StatusCode}");
+            string htmlCode = await response.Content.ReadAsStringAsync();
+            return htmlCode;
         }
 
         public static void ParsingHtml(string htmlCode)
@@ -89,13 +95,16 @@ namespace PR7_HttpNaewPAT_Mohov
             var html = new HtmlDocument();
             html.LoadHtml(htmlCode);
             var Document = html.DocumentNode;
-            var Content = Document.Descendants(0).Where(n => n.HasClass(""));
-            foreach (HtmlNode content in Content)
+            var newsItems = Document.Descendants("div").Where(n => n.HasClass("news"));
+            foreach (var newsItem in newsItems)
             {
-                var src = content.ChildNodes[1].GetAttributeValue("src", "none");
-                var name = content.ChildNodes[3].InnerText;
-                var description = content.ChildNodes[5].InnerText;
-                Console.WriteLine(name + "\n" + "Изображение: " + src + "\n" + "Описание: " + description);
+                var image = newsItem.Descendants("img").FirstOrDefault()?.GetAttributeValue("src", "none");
+                var name = newsItem.Descendants("div").FirstOrDefault(n => n.HasClass("name"))?.InnerText.Trim();
+                var description = newsItem.Descendants("div").FirstOrDefault(n => !n.HasClass("name"))?.InnerText.Trim();
+                Console.WriteLine($"Заголовок: {name}");
+                Console.WriteLine($"Картинка: {image}");
+                Console.WriteLine($"Описание: {description}");
+                Console.WriteLine(new string('-', 40));
             }
         }
     }
